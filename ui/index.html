@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>EveryBot</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; margin: 0; padding: 1rem; max-width: 640px; margin-inline: auto; }
+    h1 { font-size: 1.25rem; }
+    #sessions { margin-bottom: 1rem; }
+    #sessions select { width: 100%; padding: 0.5rem; }
+    #thread { min-height: 200px; border: 1px solid #ccc; padding: 0.75rem; margin-bottom: 0.75rem; border-radius: 6px; background: #fafafa; }
+    .msg { margin-bottom: 0.5rem; }
+    .msg.user { color: #06c; }
+    .msg.bot { color: #363; }
+    #inputRow { display: flex; gap: 0.5rem; }
+    #inputRow input { flex: 1; padding: 0.5rem; }
+    #inputRow button { padding: 0.5rem 1rem; }
+    .error { color: #c00; }
+  </style>
+</head>
+<body>
+  <h1>EveryBot</h1>
+  <div id="sessions">
+    <label>会话: <select id="sessionSelect"></select></label>
+    <button type="button" id="newSession">新建会话</button>
+  </div>
+  <div id="thread"></div>
+  <div id="inputRow">
+    <input type="text" id="messageInput" placeholder="输入消息..." />
+    <button type="button" id="sendBtn">发送</button>
+  </div>
+  <p id="error" class="error"></p>
+
+  <script>
+    const API_BASE = window.location.origin;
+    const sessionSelect = document.getElementById("sessionSelect");
+    const threadEl = document.getElementById("thread");
+    const messageInput = document.getElementById("messageInput");
+    const sendBtn = document.getElementById("sendBtn");
+    const newSessionBtn = document.getElementById("newSession");
+    const errorEl = document.getElementById("error");
+
+    let currentSessionId = null;
+
+    function setError(msg) {
+      errorEl.textContent = msg || "";
+    }
+
+    async function loadSessions() {
+      try {
+        const res = await fetch(API_BASE + "/api/sessions");
+        const data = await res.json();
+        const sessions = data.sessions || [];
+        sessionSelect.innerHTML = "";
+        const opt0 = document.createElement("option");
+        opt0.value = "";
+        opt0.textContent = "(选择或新建)";
+        sessionSelect.appendChild(opt0);
+        for (const s of sessions) {
+          const opt = document.createElement("option");
+          opt.value = s.convId;
+          opt.textContent = s.convId + " (" + (s.updatedAt || "").slice(0, 10) + ")";
+          sessionSelect.appendChild(opt);
+        }
+        if (currentSessionId) {
+          sessionSelect.value = currentSessionId;
+        }
+      } catch (e) {
+        setError("加载会话列表失败: " + e.message);
+      }
+    }
+
+    async function loadThread() {
+      if (!currentSessionId) {
+        threadEl.innerHTML = "<p>选择或新建会话后发送消息。</p>";
+        return;
+      }
+      try {
+        const res = await fetch(API_BASE + "/api/thread?sessionId=" + encodeURIComponent(currentSessionId));
+        const data = await res.json();
+        const thread = data.thread || [];
+        threadEl.innerHTML = thread.map((m) =>
+          '<div class="msg ' + m.role + '">' + escapeHtml(m.text) + "</div>"
+        ).join("") || "<p>暂无消息</p>";
+        threadEl.scrollTop = threadEl.scrollHeight;
+      } catch (e) {
+        setError("加载对话失败: " + e.message);
+      }
+    }
+
+    function escapeHtml(s) {
+      const div = document.createElement("div");
+      div.textContent = s;
+      return div.innerHTML;
+    }
+
+    async function sendMessage() {
+      const text = messageInput.value?.trim();
+      if (!text) return;
+      setError("");
+      try {
+        const res = await fetch(API_BASE + "/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sessionId: currentSessionId || undefined,
+            message: text,
+          }),
+        });
+        const data = await res.json();
+        if (data.error) {
+          setError(data.error);
+          return;
+        }
+        if (data.sessionId) {
+          currentSessionId = data.sessionId;
+          await loadSessions();
+        }
+        messageInput.value = "";
+        await loadThread();
+      } catch (e) {
+        setError("发送失败: " + e.message);
+      }
+    }
+
+    sessionSelect.addEventListener("change", () => {
+      currentSessionId = sessionSelect.value || null;
+      loadThread();
+    });
+    newSessionBtn.addEventListener("click", () => {
+      currentSessionId = null;
+      sessionSelect.value = "";
+      threadEl.innerHTML = "<p>新建会话。输入消息后发送。</p>";
+    });
+    sendBtn.addEventListener("click", sendMessage);
+    messageInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") sendMessage();
+    });
+
+    loadSessions();
+  </script>
+</body>
+</html>

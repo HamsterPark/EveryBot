@@ -1,2 +1,8 @@
+node_modules
+dist
+data
+.env
+*.log
+.DS_Store
 /moltbot-main
-/新建 文本文档.txt
+新建 文本文档.txt
