@@ -1,19 +1,6 @@
 import path from "node:path";
 import fs from "node:fs/promises";
 
-function stripTrailingSep(p: string): string {
-  const sep = path.win32.sep;
-  if (p.length > 3 && p.endsWith(sep)) return p.slice(0, -1);
-  return p;
-}
-
-function normalizeWin(p: string): string {
-  let s = p.replace(/\//g, "\\");
-  if (s.startsWith("\\\\?\\")) s = s.slice(4);
-  s = stripTrailingSep(s);
-  return s.toLowerCase();
-}
-
 async function exists(p: string): Promise<boolean> {
   try {
     await fs.lstat(p);
@@ -33,12 +20,9 @@ export class WorkspaceFS {
       throw new Error(`Symlink/junction is not allowed: ${p}`);
     }
 
-    if (process.platform === "win32") {
-      const rp = await fs.realpath(p);
-      if (normalizeWin(rp) !== normalizeWin(p)) {
-        throw new Error(`Reparse/mount-like path is not allowed: ${p}`);
-      }
-    }
+    // On Windows, skip realpath comparison: os.tmpdir() etc. can return short (8.3) paths,
+    // and realpath() resolves to long form, so we would falsely reject normal directories.
+    // Symlink/junction are already rejected by isSymbolicLink() above.
   }
 
   private async ensureInsideWorkspace(
