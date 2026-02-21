@@ -169,11 +169,14 @@ export function createHttpServer(
         return;
       }
 
+      const MAX_WRITE_BYTES = 10 * 1024 * 1024; // 10 MB
       if (fileTools && approvalManager && pathname === "/api/tools/file/write" && req.method === "POST") {
         const body = await parseBody(req);
         const p = body.path as string;
-        const content = body.content as string;
+        const content = body.content;
         if (!p) { sendJson(res, 400, { error: "Missing path" }); return; }
+        if (typeof content !== "string") { sendJson(res, 400, { error: "Missing or invalid content" }); return; }
+        if (Buffer.byteLength(content, "utf-8") > MAX_WRITE_BYTES) { sendJson(res, 413, { error: "Content too large" }); return; }
         const id = approvalManager.add("file.write", { path: p, content });
         if (auditLogger) await auditLogger.log({ tool: "file.write", args: { path: p }, result: "pending", detail: id });
         sendJson(res, 200, { pendingId: id, message: "Approval required" });
@@ -198,9 +201,11 @@ export function createHttpServer(
 
       if (schedulerEngine && pathname === "/api/tasks" && req.method === "POST") {
         const body = await parseBody(req);
+        if (!body.cron || typeof body.cron !== "string") { sendJson(res, 400, { error: "Missing or invalid cron" }); return; }
+        if (!body.action || typeof body.action !== "object" || Array.isArray(body.action)) { sendJson(res, 400, { error: "Missing or invalid action" }); return; }
         const task = await schedulerEngine.addTask({
           id: (body.id as string) ?? crypto.randomUUID(),
-          cron: body.cron as string,
+          cron: body.cron,
           timezone: body.timezone as string | undefined,
           action: body.action as import("../scheduler/schedulerEngine.js").TaskAction,
           enabled: (body.enabled as boolean) ?? true,
