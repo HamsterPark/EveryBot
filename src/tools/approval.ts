@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { randomUUID } from "node:crypto";
 
 export type PendingTool = {
   id: string;
@@ -14,7 +14,7 @@ export class ApprovalManager {
   private listeners: Array<(id: string, approved: boolean) => void> = [];
 
   add(tool: string, args: unknown): string {
-    const id = randomBytes(8).toString("hex");
+    const id = randomUUID();
     this.pending.set(id, {
       id,
       tool,
