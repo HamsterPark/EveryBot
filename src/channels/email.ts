@@ -227,6 +227,11 @@ export class EmailChannel {
     this.log.info({ convId: meta.convId, msgNo, agentId }, "Replied");
   }
 
+  /** Strip CR and LF to prevent email header injection. */
+  private sanitizeHeader(value: string): string {
+    return value.replace(/[\r\n]/g, "");
+  }
+
   private async sendMail(args: {
     to: string;
     subject: string;
@@ -240,8 +245,8 @@ export class EmailChannel {
       "X-Moltbot-Conv": args.convId,
     };
     const extraHeaders: Record<string, string> = { ...headers };
-    if (args.inReplyTo) extraHeaders["In-Reply-To"] = args.inReplyTo;
-    if (args.references?.length) extraHeaders["References"] = args.references.join(" ");
+    if (args.inReplyTo) extraHeaders["In-Reply-To"] = this.sanitizeHeader(args.inReplyTo);
+    if (args.references?.length) extraHeaders["References"] = this.sanitizeHeader(args.references.join(" "));
 
     await this.smtpTransport.sendMail({
       from: this.cfg.mail.user,
