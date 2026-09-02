@@ -1,8 +1,17 @@
-node_modules
-dist
-data
+# Dependencies and build output
+node_modules/
+dist/
+coverage/
+
+# Runtime data (conversations, workspace, tasks, audit logs)
+data/
+
+# Local environment files (never commit secrets)
 .env
+.env.*
+!.env.example
+
+# Logs and OS noise
 *.log
 .DS_Store
-/moltbot-main
-新建 文本文档.txt
+Thumbs.db
