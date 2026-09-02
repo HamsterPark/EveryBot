@@ -33,10 +33,6 @@ export class ProcessedStore {
   async add(key: string): Promise<void> {
     if (this.seen.has(key)) return;
     this.seen.add(key);
-    await fs.appendFile(
-      this.filePath,
-      JSON.stringify({ key, at: new Date().toISOString() }) + "\n",
-      "utf-8"
-    );
+    await fs.appendFile(this.filePath, JSON.stringify({ key, at: new Date().toISOString() }) + "\n", "utf-8");
   }
 }

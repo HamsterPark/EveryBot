@@ -5,8 +5,7 @@ export type MbCtx = {
   isoTime?: string;
 };
 
-const MBCTX_RE =
-  /MBCTX\s+v1\s*\|\s*c=([A-Z0-9]+)\s*\|\s*m=(\d+)\s*\|\s*a=([a-z0-9_-]+)(?:\s*\|\s*t=([0-9TZ:.-]+))?/gi;
+const MBCTX_RE = /MBCTX\s+v1\s*\|\s*c=([A-Z0-9]+)\s*\|\s*m=(\d+)\s*\|\s*a=([a-z0-9_-]+)(?:\s*\|\s*t=([0-9TZ:.-]+))?/gi;
 
 export function parseLatestMbCtx(text: string): MbCtx | null {
   let m: RegExpExecArray | null;

@@ -64,8 +64,7 @@ export class SiliconFlowProvider implements LLMProvider {
           choices?: Array<{ message?: { content?: string }; text?: string }>;
           usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
         };
-        const text =
-          json?.choices?.[0]?.message?.content ?? json?.choices?.[0]?.text ?? "";
+        const text = json?.choices?.[0]?.message?.content ?? json?.choices?.[0]?.text ?? "";
 
         return { text: String(text).trim(), usage: json?.usage, raw: json };
       } catch (e) {

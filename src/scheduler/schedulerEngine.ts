@@ -43,11 +43,7 @@ export class SchedulerEngine {
 
   async save(): Promise<void> {
     await fs.mkdir(path.dirname(this.filePath), { recursive: true });
-    await fs.writeFile(
-      this.filePath,
-      JSON.stringify({ tasks: this.tasks }, null, 2),
-      "utf-8"
-    );
+    await fs.writeFile(this.filePath, JSON.stringify({ tasks: this.tasks }, null, 2), "utf-8");
   }
 
   getTasks(): Task[] {
@@ -83,11 +79,7 @@ export class SchedulerEngine {
   }
 
   async appendRun(entry: { taskId: string; at: string; ok: boolean; detail?: string }): Promise<void> {
-    await fs.appendFile(
-      this.runsPath,
-      JSON.stringify(entry) + "\n",
-      "utf-8"
-    );
+    await fs.appendFile(this.runsPath, JSON.stringify(entry) + "\n", "utf-8");
   }
 
   getEnabledTasks(): Task[] {

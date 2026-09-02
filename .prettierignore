@@ -1,5 +1,6 @@
 dist
 node_modules
+coverage
 data
-moltbot-main
-*.md
+package-lock.json
+docs/*.png

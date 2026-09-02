@@ -16,8 +16,17 @@ function makeConfig(): AppConfig {
     workspaceRoot: os.tmpdir(),
     defaultAgent: "default",
     pollIntervalMs: 60000,
-    llm: { baseUrl: "", apiKey: "", models: { default: "", files: "", scheduler: "", memorySummary: "", memoryFacts: "" } },
-    mail: { user: "", pass: "", imap: { host: "", port: 993, secure: true }, smtp: { host: "", port: 587, secure: false } },
+    llm: {
+      baseUrl: "",
+      apiKey: "",
+      models: { default: "", files: "", scheduler: "", memorySummary: "", memoryFacts: "" },
+    },
+    mail: {
+      user: "",
+      pass: "",
+      imap: { host: "", port: 993, secure: true },
+      smtp: { host: "", port: 587, secure: false },
+    },
   } as unknown as AppConfig;
 }
 
@@ -25,11 +34,19 @@ async function doPost(port: number, pathname: string, body: unknown): Promise<{ 
   const raw = JSON.stringify(body);
   return new Promise((resolve, reject) => {
     const req = http.request(
-      { hostname: "127.0.0.1", port, path: pathname, method: "POST", headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(raw) } },
+      {
+        hostname: "127.0.0.1",
+        port,
+        path: pathname,
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(raw) },
+      },
       (res) => {
         const chunks: Buffer[] = [];
         res.on("data", (c) => chunks.push(c));
-        res.on("end", () => resolve({ status: res.statusCode ?? 0, json: JSON.parse(Buffer.concat(chunks).toString()) }));
+        res.on("end", () =>
+          resolve({ status: res.statusCode ?? 0, json: JSON.parse(Buffer.concat(chunks).toString()) })
+        );
       }
     );
     req.on("error", reject);
@@ -85,7 +102,9 @@ describe("HTTP server validation", () => {
     const agents = { has: vi.fn(), get: vi.fn(), register: vi.fn() } as unknown as AgentRegistry;
     const schedulerEngine = { getTasks: vi.fn(), addTask: vi.fn(), getEnabledTasks: vi.fn() } as unknown;
 
-    const server = createHttpServer(cfg, convStore, agents, null, { schedulerEngine: schedulerEngine as import("../scheduler/schedulerEngine.js").SchedulerEngine });
+    const server = createHttpServer(cfg, convStore, agents, null, {
+      schedulerEngine: schedulerEngine as import("../scheduler/schedulerEngine.js").SchedulerEngine,
+    });
     await startHttpServer(server, 0);
     const port = (server.address() as { port: number }).port;
     try {
@@ -103,7 +122,9 @@ describe("HTTP server validation", () => {
     const agents = { has: vi.fn(), get: vi.fn(), register: vi.fn() } as unknown as AgentRegistry;
     const schedulerEngine = { getTasks: vi.fn(), addTask: vi.fn(), getEnabledTasks: vi.fn() } as unknown;
 
-    const server = createHttpServer(cfg, convStore, agents, null, { schedulerEngine: schedulerEngine as import("../scheduler/schedulerEngine.js").SchedulerEngine });
+    const server = createHttpServer(cfg, convStore, agents, null, {
+      schedulerEngine: schedulerEngine as import("../scheduler/schedulerEngine.js").SchedulerEngine,
+    });
     await startHttpServer(server, 0);
     const port = (server.address() as { port: number }).port;
     try {

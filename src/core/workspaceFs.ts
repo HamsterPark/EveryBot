@@ -25,10 +25,7 @@ export class WorkspaceFS {
     // Symlink/junction are already rejected by isSymbolicLink() above.
   }
 
-  private async ensureInsideWorkspace(
-    userPath: string,
-    mode: "read" | "write" | "list" | "delete"
-  ): Promise<string> {
+  private async ensureInsideWorkspace(userPath: string, mode: "read" | "write" | "list" | "delete"): Promise<string> {
     if (!userPath || userPath.trim() === "") throw new Error("Empty path");
 
     if (path.win32.isAbsolute(userPath)) throw new Error("Absolute path not allowed");

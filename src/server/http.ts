@@ -103,7 +103,11 @@ export function createHttpServer(
 
         const memory: MemoryPack = memoryEngine
           ? await memoryEngine.buildMemoryPack(meta.convId)
-          : { summary: "", facts: {}, recentTurns: (await convStore.getThread(meta.convId)).map((t) => ({ role: t.role, text: t.text })) };
+          : {
+              summary: "",
+              facts: {},
+              recentTurns: (await convStore.getThread(meta.convId)).map((t) => ({ role: t.role, text: t.text })),
+            };
 
         const agent = agents.get(effectiveAgent);
         const replyText = await agent.handle(message, { convId: meta.convId, agentId: effectiveAgent }, memory);
@@ -153,7 +157,13 @@ export function createHttpServer(
         const body = await parseBody(req);
         const p = (body.path as string) ?? ".";
         const out = await fileTools.list(p);
-        if (auditLogger) await auditLogger.log({ tool: "file.list", args: { path: p }, result: out.ok ? "ok" : "error", detail: out.ok ? undefined : (out as { error: string }).error });
+        if (auditLogger)
+          await auditLogger.log({
+            tool: "file.list",
+            args: { path: p },
+            result: out.ok ? "ok" : "error",
+            detail: out.ok ? undefined : (out as { error: string }).error,
+          });
         sendJson(res, 200, out);
         return;
       }
@@ -162,9 +172,18 @@ export function createHttpServer(
         const body = await parseBody(req);
         const p = body.path as string;
         const maxBytes = (body.maxBytes as number) ?? 1_000_000;
-        if (!p) { sendJson(res, 400, { error: "Missing path" }); return; }
+        if (!p) {
+          sendJson(res, 400, { error: "Missing path" });
+          return;
+        }
         const out = await fileTools.read(p, maxBytes);
-        if (auditLogger) await auditLogger.log({ tool: "file.read", args: { path: p }, result: out.ok ? "ok" : "error", detail: out.ok ? undefined : (out as { error: string }).error });
+        if (auditLogger)
+          await auditLogger.log({
+            tool: "file.read",
+            args: { path: p },
+            result: out.ok ? "ok" : "error",
+            detail: out.ok ? undefined : (out as { error: string }).error,
+          });
         sendJson(res, 200, out);
         return;
       }
@@ -174,11 +193,21 @@ export function createHttpServer(
         const body = await parseBody(req);
         const p = body.path as string;
         const content = body.content;
-        if (!p) { sendJson(res, 400, { error: "Missing path" }); return; }
-        if (typeof content !== "string") { sendJson(res, 400, { error: "Missing or invalid content" }); return; }
-        if (Buffer.byteLength(content, "utf-8") > MAX_WRITE_BYTES) { sendJson(res, 413, { error: "Content too large" }); return; }
+        if (!p) {
+          sendJson(res, 400, { error: "Missing path" });
+          return;
+        }
+        if (typeof content !== "string") {
+          sendJson(res, 400, { error: "Missing or invalid content" });
+          return;
+        }
+        if (Buffer.byteLength(content, "utf-8") > MAX_WRITE_BYTES) {
+          sendJson(res, 413, { error: "Content too large" });
+          return;
+        }
         const id = approvalManager.add("file.write", { path: p, content });
-        if (auditLogger) await auditLogger.log({ tool: "file.write", args: { path: p }, result: "pending", detail: id });
+        if (auditLogger)
+          await auditLogger.log({ tool: "file.write", args: { path: p }, result: "pending", detail: id });
         sendJson(res, 200, { pendingId: id, message: "Approval required" });
         return;
       }
@@ -186,9 +215,13 @@ export function createHttpServer(
       if (fileTools && approvalManager && pathname === "/api/tools/file/delete" && req.method === "POST") {
         const body = await parseBody(req);
         const p = body.path as string;
-        if (!p) { sendJson(res, 400, { error: "Missing path" }); return; }
+        if (!p) {
+          sendJson(res, 400, { error: "Missing path" });
+          return;
+        }
         const id = approvalManager.add("file.delete", { path: p });
-        if (auditLogger) await auditLogger.log({ tool: "file.delete", args: { path: p }, result: "pending", detail: id });
+        if (auditLogger)
+          await auditLogger.log({ tool: "file.delete", args: { path: p }, result: "pending", detail: id });
         sendJson(res, 200, { pendingId: id, message: "Approval required" });
         return;
       }
@@ -201,8 +234,14 @@ export function createHttpServer(
 
       if (schedulerEngine && pathname === "/api/tasks" && req.method === "POST") {
         const body = await parseBody(req);
-        if (!body.cron || typeof body.cron !== "string") { sendJson(res, 400, { error: "Missing or invalid cron" }); return; }
-        if (!body.action || typeof body.action !== "object" || Array.isArray(body.action)) { sendJson(res, 400, { error: "Missing or invalid action" }); return; }
+        if (!body.cron || typeof body.cron !== "string") {
+          sendJson(res, 400, { error: "Missing or invalid cron" });
+          return;
+        }
+        if (!body.action || typeof body.action !== "object" || Array.isArray(body.action)) {
+          sendJson(res, 400, { error: "Missing or invalid action" });
+          return;
+        }
         const task = await schedulerEngine.addTask({
           id: (body.id as string) ?? crypto.randomUUID(),
           cron: body.cron,
@@ -219,14 +258,26 @@ export function createHttpServer(
         return;
       }
 
-      if (fileTools && auditLogger && approvalManager && pathname.startsWith("/api/approvals/") && req.method === "POST") {
+      if (
+        fileTools &&
+        auditLogger &&
+        approvalManager &&
+        pathname.startsWith("/api/approvals/") &&
+        req.method === "POST"
+      ) {
         const parts = pathname.slice("/api/approvals/".length).split("/");
         const id = parts[0];
         const action = parts[1];
-        if (!id) { sendJson(res, 400, { error: "Missing id" }); return; }
+        if (!id) {
+          sendJson(res, 400, { error: "Missing id" });
+          return;
+        }
         if (action === "approve") {
           const p = approvalManager.approve(id);
-          if (!p) { sendJson(res, 404, { error: "Not found" }); return; }
+          if (!p) {
+            sendJson(res, 404, { error: "Not found" });
+            return;
+          }
           let out: { ok: boolean; data?: string | string[]; error?: string };
           if (p.tool === "file.write") {
             const args = p.args as { path: string; content: string };
@@ -234,8 +285,16 @@ export function createHttpServer(
           } else if (p.tool === "file.delete") {
             const args = p.args as { path: string };
             out = await fileTools.delete(args.path);
-          } else { sendJson(res, 400, { error: "Unknown tool" }); return; }
-          await auditLogger.log({ tool: p.tool, args: p.args, result: out.ok ? "ok" : "error", detail: out.ok ? undefined : (out as { error: string }).error });
+          } else {
+            sendJson(res, 400, { error: "Unknown tool" });
+            return;
+          }
+          await auditLogger.log({
+            tool: p.tool,
+            args: p.args,
+            result: out.ok ? "ok" : "error",
+            detail: out.ok ? undefined : (out as { error: string }).error,
+          });
           sendJson(res, 200, out);
           return;
         }
@@ -264,10 +323,7 @@ export function createHttpServer(
   });
 }
 
-export function startHttpServer(
-  server: ReturnType<typeof createServer>,
-  port: number
-): Promise<void> {
+export function startHttpServer(server: ReturnType<typeof createServer>, port: number): Promise<void> {
   return new Promise((resolve) => {
     server.listen(port, () => resolve());
   });

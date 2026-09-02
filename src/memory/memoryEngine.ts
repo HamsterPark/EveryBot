@@ -74,10 +74,7 @@ export class MemoryEngine {
   async afterReply(convId: string, newTurns: ThreadItem[]): Promise<void> {
     if (!newTurns.length) return;
 
-    const [oldSummary, oldFacts] = await Promise.all([
-      this.readSummary(convId),
-      this.readFacts(convId),
-    ]);
+    const [oldSummary, oldFacts] = await Promise.all([this.readSummary(convId), this.readFacts(convId)]);
 
     const delta = newTurns.map((t) => `${t.role.toUpperCase()}: ${t.text}`).join("\n\n");
 
@@ -123,10 +120,7 @@ export class MemoryEngine {
     return res.text;
   }
 
-  private async updateFactsWithLLM(
-    oldFacts: Record<string, unknown>,
-    delta: string
-  ): Promise<Record<string, unknown>> {
+  private async updateFactsWithLLM(oldFacts: Record<string, unknown>, delta: string): Promise<Record<string, unknown>> {
     if (!this.provider) return oldFacts;
 
     const sys = [

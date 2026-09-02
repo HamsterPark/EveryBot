@@ -195,7 +195,11 @@ export class EmailChannel {
 
     const memory: MemoryPack = this.memoryEngine
       ? await this.memoryEngine.buildMemoryPack(meta.convId)
-      : { summary: "", facts: {}, recentTurns: (await this.convStore.getThread(meta.convId)).map((t) => ({ role: t.role, text: t.text })) };
+      : {
+          summary: "",
+          facts: {},
+          recentTurns: (await this.convStore.getThread(meta.convId)).map((t) => ({ role: t.role, text: t.text })),
+        };
 
     const agent = this.agents.get(agentId);
     const replyText = await agent.handle(inb.text, { convId: meta.convId, agentId }, memory);

@@ -42,12 +42,10 @@ async function main(): Promise<void> {
   }
 
   const convStore = new ConversationStore(cfg.dataDir);
-  const memoryEngine = new MemoryEngine(
-    cfg.dataDir,
-    convStore,
-    cfg.llm.apiKey ? provider : null,
-    { summary: cfg.llm.models.memorySummary, facts: cfg.llm.models.memoryFacts }
-  );
+  const memoryEngine = new MemoryEngine(cfg.dataDir, convStore, cfg.llm.apiKey ? provider : null, {
+    summary: cfg.llm.models.memorySummary,
+    facts: cfg.llm.models.memoryFacts,
+  });
 
   const workspaceFs = new WorkspaceFS(cfg.workspaceRoot);
   const fileTools = createFileTools(workspaceFs);
@@ -94,14 +92,18 @@ async function main(): Promise<void> {
     },
     async runTool(toolName: string, args: Record<string, unknown>): Promise<unknown> {
       if (toolName === "file.list") return await fileTools.list((args.path as string) ?? ".");
-      if (toolName === "file.read") return await fileTools.read((args.path as string) ?? "", (args.maxBytes as number) ?? 1_000_000);
-      if (toolName === "file.write") return await fileTools.write((args.path as string) ?? "", (args.content as string) ?? "");
+      if (toolName === "file.read")
+        return await fileTools.read((args.path as string) ?? "", (args.maxBytes as number) ?? 1_000_000);
+      if (toolName === "file.write")
+        return await fileTools.write((args.path as string) ?? "", (args.content as string) ?? "");
       if (toolName === "file.delete") return await fileTools.delete((args.path as string) ?? "");
       throw new Error(`Unknown tool: ${toolName}`);
     },
     async runChat(promptTemplate: string): Promise<string> {
       const meta = await convStore.createConversation(cfg.defaultAgent);
-      const memory = memoryEngine ? await memoryEngine.buildMemoryPack(meta.convId) : { summary: "", facts: {}, recentTurns: [] };
+      const memory = memoryEngine
+        ? await memoryEngine.buildMemoryPack(meta.convId)
+        : { summary: "", facts: {}, recentTurns: [] };
       const agent = agents.get(cfg.defaultAgent);
       return await agent.handle(promptTemplate, { convId: meta.convId, agentId: cfg.defaultAgent }, memory);
     },
