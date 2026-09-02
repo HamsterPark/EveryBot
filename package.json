@@ -1,7 +1,7 @@
 {
   "name": "everybot",
-  "version": "0.1.0",
-  "description": "Moltbot-Lite: Windows-first AI assistant with Web + Mail, workspace files, memory, and scheduled tasks",
+  "version": "0.2.0",
+  "description": "A small, self-hosted AI assistant you can talk to through a web UI or plain email, with sandboxed file tools, approval-gated writes, file-based memory and cron scheduling",
   "type": "module",
   "main": "dist/index.js",
   "license": "MIT",
