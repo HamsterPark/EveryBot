@@ -92,7 +92,9 @@ async function main(): Promise<void> {
   }
 
   const processedStore = new ProcessedStore(cfg.dataDir);
-  const emailChannel = new EmailChannel(cfg, agents, convStore, processedStore, memoryEngine);
+  const emailChannel = new EmailChannel(cfg, agents, convStore, processedStore, memoryEngine, {
+    smtpTransport: smtpTransport ?? undefined,
+  });
   await emailChannel.start();
 
   const shutdown = async (signal: string): Promise<void> => {

@@ -32,6 +32,8 @@ export type AppConfig = {
   mail: {
     user: string;
     pass: string;
+    /** Senders whose mail is answered; empty means "only mail from MAIL_USER itself". */
+    allowedSenders: string[];
     /** Addresses scheduled tasks may mail; empty means "only MAIL_USER itself". */
     allowedRecipients: string[];
     imap: { host: string; port: number; secure: boolean };
@@ -68,6 +70,7 @@ export function loadConfig(): AppConfig {
     mail: {
       user: envOptional("MAIL_USER", ""),
       pass: envOptional("MAIL_PASS", ""),
+      allowedSenders: parseAddressList(process.env.MAIL_ALLOWED_SENDERS),
       allowedRecipients: parseAddressList(process.env.MAIL_ALLOWED_RECIPIENTS),
       imap: {
         host: envOptional("IMAP_HOST", "imap.qq.com"),

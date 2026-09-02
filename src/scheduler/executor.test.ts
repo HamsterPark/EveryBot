@@ -22,6 +22,7 @@ function makeConfig(mail: Partial<AppConfig["mail"]> = {}): AppConfig {
     mail: {
       user: "owner@example.com",
       pass: "secret",
+      allowedSenders: [],
       allowedRecipients: [],
       imap: { host: "", port: 993, secure: true },
       smtp: { host: "", port: 465, secure: true },

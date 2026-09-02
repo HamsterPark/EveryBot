@@ -14,9 +14,10 @@ export type TurnResult = { replyText: string; msgNo: number };
  * One request/response exchange with an agent.
  *
  * Order matters: the context is built from turns that happened *before* this message
- * (the agent appends the current user message itself), then both turns are persisted
- * and handed to the memory engine. The HTTP API, the e-mail channel and scheduled chats
- * all go through here so the behaviour is identical.
+ * (the agent appends the current user message itself). Nothing is persisted until the
+ * agent has answered, so a failed LLM call leaves no orphaned user turn behind and the
+ * caller can simply retry. The HTTP API, the e-mail channel and scheduled chats all go
+ * through here so the behaviour is identical.
  */
 export async function runConversationTurn(
   deps: TurnDeps,
@@ -35,11 +36,11 @@ export async function runConversationTurn(
         recentTurns: (await convStore.getThread(meta.convId)).map((t) => ({ role: t.role, text: t.text })),
       };
 
-  const userItem: ThreadItem = { role: "user", text: userText, at: new Date().toISOString(), emailId: opts.emailId };
-  await convStore.append(meta.convId, userItem);
-
   const agent = agents.get(agentId);
   const replyText = await agent.handle(userText, { convId: meta.convId, agentId }, memory);
+
+  const userItem: ThreadItem = { role: "user", text: userText, at: new Date().toISOString(), emailId: opts.emailId };
+  await convStore.append(meta.convId, userItem);
 
   const msgNo = await convStore.nextBotMsgNo(meta.convId);
   const botItem: ThreadItem = { role: "bot", text: replyText, at: new Date().toISOString(), msgNo, agentId };
