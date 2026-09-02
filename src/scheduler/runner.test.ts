@@ -28,7 +28,6 @@ describe("SchedulerRunner", () => {
   });
 
   afterEach(async () => {
-    vi.useRealTimers();
     await fs.rm(dir, { recursive: true, force: true });
   });
 
@@ -98,16 +97,19 @@ describe("SchedulerRunner", () => {
   });
 
   it("fires a scheduled job when its cron time arrives", async () => {
-    vi.useFakeTimers();
+    // Real timers on purpose: croner's scheduling does not cooperate with fake clocks.
     await engine.addTask({ id: "every-second", cron: "* * * * * *", action: chat, enabled: true });
     const executor = makeExecutor();
     const runner = new SchedulerRunner(engine, executor, logger);
     await runner.start();
     try {
-      await vi.advanceTimersByTimeAsync(1500);
-      expect(executor.runChat).toHaveBeenCalled();
+      const deadline = Date.now() + 3000;
+      while (executor.runChat.mock.calls.length === 0 && Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, 50));
+      }
+      expect(executor.runChat).toHaveBeenCalledWith("tick", { taskId: "every-second" });
     } finally {
       runner.stop();
     }
-  });
+  }, 6000);
 });
