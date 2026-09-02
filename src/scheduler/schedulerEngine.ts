@@ -21,6 +21,16 @@ export type TasksFile = {
   tasks: Task[];
 };
 
+export type RunEntry = { taskId: string; at: string; ok: boolean; detail?: string };
+
+export class DuplicateTaskError extends Error {
+  constructor(id: string) {
+    super(`Task already exists: ${id}`);
+    this.name = "DuplicateTaskError";
+  }
+}
+
+/** Persists scheduled tasks in data/tasks.json and appends run results to data/runs.jsonl. */
 export class SchedulerEngine {
   private filePath: string;
   private runsPath: string;
@@ -31,14 +41,31 @@ export class SchedulerEngine {
     this.runsPath = path.join(dataDir, "runs.jsonl");
   }
 
+  /**
+   * Load tasks.json. A missing file means "no tasks"; a corrupt file is an error rather
+   * than silently starting with an empty list (which would lose every task on next save).
+   */
   async load(): Promise<void> {
+    let raw: string;
     try {
-      const raw = await fs.readFile(this.filePath, "utf-8");
-      const data = JSON.parse(raw) as TasksFile;
-      this.tasks = Array.isArray(data.tasks) ? data.tasks : [];
-    } catch {
-      this.tasks = [];
+      raw = await fs.readFile(this.filePath, "utf-8");
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code === "ENOENT") {
+        this.tasks = [];
+        return;
+      }
+      throw e;
     }
+
+    let data: unknown;
+    try {
+      data = JSON.parse(raw);
+    } catch (e) {
+      throw new Error(`Cannot parse ${this.filePath}: ${e instanceof Error ? e.message : String(e)}`, { cause: e });
+    }
+    const tasks = (data as Partial<TasksFile> | null)?.tasks;
+    if (!Array.isArray(tasks)) throw new Error(`Invalid tasks file ${this.filePath}: expected {"tasks": [...]}`);
+    this.tasks = tasks;
   }
 
   async save(): Promise<void> {
@@ -50,7 +77,12 @@ export class SchedulerEngine {
     return [...this.tasks];
   }
 
+  getTask(id: string): Task | undefined {
+    return this.tasks.find((t) => t.id === id);
+  }
+
   async addTask(task: Omit<Task, "createdAt" | "updatedAt">): Promise<Task> {
+    if (this.tasks.some((t) => t.id === task.id)) throw new DuplicateTaskError(task.id);
     const now = new Date().toISOString();
     const t: Task = {
       ...task,
@@ -62,10 +94,18 @@ export class SchedulerEngine {
     return t;
   }
 
+  async removeTask(id: string): Promise<boolean> {
+    const before = this.tasks.length;
+    this.tasks = this.tasks.filter((t) => t.id !== id);
+    if (this.tasks.length === before) return false;
+    await this.save();
+    return true;
+  }
+
   async updateTask(id: string, patch: Partial<Task>): Promise<Task | null> {
     const i = this.tasks.findIndex((t) => t.id === id);
     if (i < 0) return null;
-    this.tasks[i] = { ...this.tasks[i], ...patch, updatedAt: new Date().toISOString() };
+    this.tasks[i] = { ...this.tasks[i], ...patch, id, updatedAt: new Date().toISOString() };
     await this.save();
     return this.tasks[i];
   }
@@ -78,7 +118,8 @@ export class SchedulerEngine {
     }
   }
 
-  async appendRun(entry: { taskId: string; at: string; ok: boolean; detail?: string }): Promise<void> {
+  async appendRun(entry: RunEntry): Promise<void> {
+    await fs.mkdir(path.dirname(this.runsPath), { recursive: true });
     await fs.appendFile(this.runsPath, JSON.stringify(entry) + "\n", "utf-8");
   }
 

@@ -1,4 +1,5 @@
 import path from "node:path";
+import { parseAddressList } from "./core/allowlist.js";
 
 function envOptional(name: string, fallback: string): string {
   return process.env[name] ?? fallback;
@@ -31,6 +32,8 @@ export type AppConfig = {
   mail: {
     user: string;
     pass: string;
+    /** Addresses scheduled tasks may mail; empty means "only MAIL_USER itself". */
+    allowedRecipients: string[];
     imap: { host: string; port: number; secure: boolean };
     smtp: { host: string; port: number; secure: boolean };
   };
@@ -63,6 +66,7 @@ export function loadConfig(): AppConfig {
     mail: {
       user: envOptional("MAIL_USER", ""),
       pass: envOptional("MAIL_PASS", ""),
+      allowedRecipients: parseAddressList(process.env.MAIL_ALLOWED_RECIPIENTS),
       imap: {
         host: envOptional("IMAP_HOST", "imap.qq.com"),
         port: envInt("IMAP_PORT", 993),

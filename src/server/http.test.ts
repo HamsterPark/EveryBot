@@ -11,7 +11,8 @@ import { ConversationStore } from "../conversation/store.js";
 import { ApprovalManager } from "../tools/approval.js";
 import type { FileToolsApi } from "../tools/fileTools.js";
 import type { AuditLogger } from "../tools/audit.js";
-import type { SchedulerEngine } from "../scheduler/schedulerEngine.js";
+import { SchedulerEngine } from "../scheduler/schedulerEngine.js";
+import type { SchedulerRunner } from "../scheduler/runner.js";
 
 function makeConfig(overrides: Partial<AppConfig> = {}): AppConfig {
   return {
@@ -254,5 +255,69 @@ describe("HTTP chat end-to-end with a mock provider", () => {
     expect(res.status).toBe(200);
     const meta = await convStore.loadMeta((res.json as { sessionId: string }).sessionId);
     expect(meta.agentId).toBe("default");
+  });
+});
+
+describe("HTTP task endpoints", () => {
+  const action = { type: "runChat", promptTemplate: "summarize" };
+
+  async function taskServer() {
+    const dataDir = await tmpDir();
+    const schedulerEngine = new SchedulerEngine(dataDir);
+    await schedulerEngine.load();
+    const schedulerRunner = {
+      reload: vi.fn(async () => {}),
+      runNow: vi.fn(async () => ({ ok: true })),
+    } as unknown as SchedulerRunner;
+    const port = await startServer(makeConfig({ dataDir }), new ConversationStore(dataDir), stubAgents(), {
+      schedulerEngine,
+      schedulerRunner,
+    });
+    return { port, schedulerEngine, schedulerRunner };
+  }
+
+  it("creates a task, persists it and hot-reloads the runner", async () => {
+    const { port, schedulerEngine, schedulerRunner } = await taskServer();
+    const res = await request(port, "POST", "/api/tasks", { body: { id: "daily", cron: "0 9 * * *", action } });
+    expect(res.status).toBe(201);
+    expect(res.json).toMatchObject({ id: "daily", cron: "0 9 * * *", enabled: true, action });
+    expect(schedulerEngine.getTasks()).toHaveLength(1);
+    expect(schedulerRunner.reload).toHaveBeenCalledTimes(1);
+
+    const list = await request(port, "GET", "/api/tasks");
+    expect((list.json as { tasks: unknown[] }).tasks).toHaveLength(1);
+  });
+
+  it("rejects invalid cron, unknown action types and duplicate ids", async () => {
+    const { port } = await taskServer();
+    const badCron = await request(port, "POST", "/api/tasks", { body: { cron: "99 99 * * *", action } });
+    expect(badCron.status).toBe(400);
+    expect((badCron.json as { error: string }).error).toMatch(/cron/i);
+
+    const badType = await request(port, "POST", "/api/tasks", {
+      body: { cron: "* * * * *", action: { type: "shell", cmd: "rm -rf /" } },
+    });
+    expect(badType.status).toBe(400);
+    expect((badType.json as { error: string }).error).toMatch(/action\.type/);
+
+    await request(port, "POST", "/api/tasks", { body: { id: "same", cron: "* * * * *", action } });
+    const dup = await request(port, "POST", "/api/tasks", { body: { id: "same", cron: "* * * * *", action } });
+    expect(dup.status).toBe(409);
+  });
+
+  it("runs and deletes tasks by id", async () => {
+    const { port, schedulerRunner } = await taskServer();
+    await request(port, "POST", "/api/tasks", { body: { id: "job", cron: "* * * * *", action } });
+
+    const run = await request(port, "POST", "/api/tasks/job/run");
+    expect(run.status).toBe(200);
+    expect(schedulerRunner.runNow).toHaveBeenCalledWith("job");
+
+    const del = await request(port, "DELETE", "/api/tasks/job");
+    expect(del.status).toBe(200);
+    expect(schedulerRunner.reload).toHaveBeenCalledTimes(2);
+
+    expect((await request(port, "DELETE", "/api/tasks/job")).status).toBe(404);
+    expect((await request(port, "DELETE", "/api/tasks/..%2Fx")).status).toBe(400);
   });
 });

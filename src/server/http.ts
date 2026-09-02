@@ -1,5 +1,4 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -7,12 +6,14 @@ import { ConversationStore } from "../conversation/store.js";
 import { isValidId } from "../conversation/ids.js";
 import type { AgentRegistry } from "../core/agents.js";
 import type { AppConfig } from "../config.js";
-import type { MemoryPack } from "../core/agents.js";
+import { runConversationTurn } from "../core/conversationTurn.js";
 import type { MemoryEngine } from "../memory/memoryEngine.js";
 import type { FileToolsApi, FileToolResult } from "../tools/fileTools.js";
 import type { AuditLogger } from "../tools/audit.js";
 import type { ApprovalManager } from "../tools/approval.js";
-import type { SchedulerEngine, TaskAction } from "../scheduler/schedulerEngine.js";
+import { DuplicateTaskError, type SchedulerEngine } from "../scheduler/schedulerEngine.js";
+import type { SchedulerRunner } from "../scheduler/runner.js";
+import { parseTaskInput, TaskValidationError } from "../scheduler/validate.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const UI_DIR = path.join(__dirname, "..", "..", "ui");
@@ -113,6 +114,8 @@ export type HttpServerDeps = {
   auditLogger?: AuditLogger;
   approvalManager?: ApprovalManager;
   schedulerEngine?: SchedulerEngine;
+  /** When present, task changes are applied to the live schedule immediately. */
+  schedulerRunner?: SchedulerRunner;
 };
 
 export function createHttpServer(
@@ -122,7 +125,7 @@ export function createHttpServer(
   memoryEngine: MemoryEngine | null,
   deps?: HttpServerDeps
 ): ReturnType<typeof createServer> {
-  const { fileTools, auditLogger, approvalManager, schedulerEngine } = deps ?? {};
+  const { fileTools, auditLogger, approvalManager, schedulerEngine, schedulerRunner } = deps ?? {};
 
   async function audit(tool: string, args: unknown, out: FileToolResult): Promise<void> {
     if (!auditLogger) return;
@@ -175,40 +178,12 @@ export function createHttpServer(
           await convStore.saveMeta(meta);
         }
 
-        // Build the context from turns *before* this message; the agent appends the
-        // current user message itself, so persisting it first would send it twice.
-        const memory: MemoryPack = memoryEngine
-          ? await memoryEngine.buildMemoryPack(meta.convId)
-          : {
-              summary: "",
-              facts: {},
-              recentTurns: (await convStore.getThread(meta.convId)).map((t) => ({ role: t.role, text: t.text })),
-            };
-
-        await convStore.append(meta.convId, {
-          role: "user",
-          text: message,
-          at: new Date().toISOString(),
-        });
-
-        const agent = agents.get(effectiveAgent);
-        const replyText = await agent.handle(message, { convId: meta.convId, agentId: effectiveAgent }, memory);
-
-        const msgNo = await convStore.nextBotMsgNo(meta.convId);
-        await convStore.append(meta.convId, {
-          role: "bot",
-          text: replyText,
-          at: new Date().toISOString(),
-          msgNo,
-          agentId: effectiveAgent,
-        });
-
-        if (memoryEngine) {
-          await memoryEngine.afterReply(meta.convId, [
-            { role: "user", text: message, at: new Date().toISOString() },
-            { role: "bot", text: replyText, at: new Date().toISOString(), msgNo, agentId: effectiveAgent },
-          ]);
-        }
+        const { replyText, msgNo } = await runConversationTurn(
+          { convStore, agents, memoryEngine },
+          meta,
+          effectiveAgent,
+          message
+        );
 
         sendJson(res, 200, {
           sessionId: meta.convId,
@@ -275,19 +250,43 @@ export function createHttpServer(
 
       if (schedulerEngine && pathname === "/api/tasks" && req.method === "POST") {
         const body = await parseBody(req);
-        const cron = requireString(body.cron, "cron");
-        if (!body.action || typeof body.action !== "object" || Array.isArray(body.action)) {
-          throw new HttpError(400, "Missing or invalid action");
+        let input;
+        try {
+          input = parseTaskInput(body);
+        } catch (e) {
+          if (e instanceof TaskValidationError) throw new HttpError(400, e.message);
+          throw e;
         }
-        const task = await schedulerEngine.addTask({
-          id: optionalString(body.id, "id") ?? randomUUID(),
-          cron,
-          timezone: optionalString(body.timezone, "timezone"),
-          action: body.action as TaskAction,
-          enabled: typeof body.enabled === "boolean" ? body.enabled : true,
-        });
-        sendJson(res, 200, task);
+        let task;
+        try {
+          task = await schedulerEngine.addTask(input);
+        } catch (e) {
+          if (e instanceof DuplicateTaskError) throw new HttpError(409, e.message);
+          throw e;
+        }
+        if (schedulerRunner) await schedulerRunner.reload();
+        sendJson(res, 201, task);
         return;
+      }
+
+      if (schedulerEngine && pathname.startsWith("/api/tasks/")) {
+        const [rawId, sub] = pathname.slice("/api/tasks/".length).split("/");
+        const id = requireId(rawId, "task id");
+
+        if (req.method === "DELETE" && !sub) {
+          const removed = await schedulerEngine.removeTask(id);
+          if (!removed) throw new HttpError(404, "Task not found");
+          if (schedulerRunner) await schedulerRunner.reload();
+          sendJson(res, 200, { deleted: true });
+          return;
+        }
+
+        if (req.method === "POST" && sub === "run" && schedulerRunner) {
+          const result = await schedulerRunner.runNow(id);
+          if (!result) throw new HttpError(404, "Task not found");
+          sendJson(res, 200, result);
+          return;
+        }
       }
 
       if (approvalManager && pathname === "/api/approvals" && req.method === "GET") {
