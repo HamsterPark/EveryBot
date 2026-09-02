@@ -4,7 +4,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import nodemailer from "nodemailer";
 import { loadConfig } from "./config.js";
-import { SiliconFlowProvider } from "./core/llmProvider.js";
+import { OpenAICompatibleProvider } from "./core/llmProvider.js";
 import { AgentRegistry, createDefaultAgents } from "./core/agents.js";
 import { WorkspaceFS } from "./core/workspaceFs.js";
 import { ConversationStore } from "./conversation/store.js";
@@ -28,7 +28,7 @@ async function main(): Promise<void> {
   const cfg = loadConfig();
   await ensureDirs(cfg.dataDir);
 
-  const provider = new SiliconFlowProvider(cfg.llm.baseUrl, cfg.llm.apiKey);
+  const provider = new OpenAICompatibleProvider(cfg.llm.baseUrl, cfg.llm.apiKey, { timeoutMs: cfg.llm.timeoutMs });
   const agents = new AgentRegistry();
   for (const a of createDefaultAgents({
     provider,

@@ -2,25 +2,57 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { writeFileAtomic } from "../core/atomicWrite.js";
 import type { LLMProvider } from "../core/llmProvider.js";
-import type { ConversationStore } from "../conversation/store.js";
-import type { ThreadItem } from "../conversation/store.js";
+import type { MemoryPack } from "../core/agents.js";
+import type { ConversationStore, ThreadItem } from "../conversation/store.js";
+import { assertValidId } from "../conversation/ids.js";
 
-export type MemoryPack = {
-  summary: string;
-  facts: Record<string, unknown>;
-  recentTurns: Array<{ role: "user" | "bot"; text: string }>;
-};
+export type { MemoryPack };
 
+export type MemoryLogger = { warn(message: string): void };
+
+const SUMMARY_MAX_CHARS = 6000;
+
+/**
+ * Pull a JSON object out of an LLM reply. Models routinely wrap JSON in ```json fences
+ * or add a sentence of prose, so try the fenced block, the raw text, and the outermost
+ * {...} span before giving up.
+ */
+export function extractJsonObject(text: string): Record<string, unknown> | null {
+  const candidates: string[] = [];
+  const fence = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fence) candidates.push(fence[1]);
+  candidates.push(text);
+  const first = text.indexOf("{");
+  const last = text.lastIndexOf("}");
+  if (first >= 0 && last > first) candidates.push(text.slice(first, last + 1));
+
+  for (const candidate of candidates) {
+    try {
+      const obj: unknown = JSON.parse(candidate.trim());
+      if (obj && typeof obj === "object" && !Array.isArray(obj)) return obj as Record<string, unknown>;
+    } catch {
+      // try the next candidate
+    }
+  }
+  return null;
+}
+
+/**
+ * Per-conversation long-term memory: a rolling markdown summary plus a JSON facts
+ * object, both stored next to the thread. With a provider the LLM maintains them;
+ * without one the raw turns are appended so nothing is lost.
+ */
 export class MemoryEngine {
   constructor(
     private dataDir: string,
     private convStore: ConversationStore,
     private provider: LLMProvider | null,
-    private models: { summary: string; facts: string }
+    private models: { summary: string; facts: string },
+    private logger: MemoryLogger = console
   ) {}
 
   private convDir(convId: string): string {
-    return path.join(this.dataDir, "conv", convId);
+    return path.join(this.dataDir, "conv", assertValidId(convId, "conversation id"));
   }
 
   private summaryPath(convId: string): string {
@@ -40,7 +72,7 @@ export class MemoryEngine {
   }
 
   async writeSummary(convId: string, summary: string): Promise<void> {
-    const trimmed = (summary ?? "").trim().slice(0, 6000);
+    const trimmed = (summary ?? "").trim().slice(0, SUMMARY_MAX_CHARS);
     await writeFileAtomic(this.summaryPath(convId), trimmed + "\n");
   }
 
@@ -70,21 +102,30 @@ export class MemoryEngine {
     return { summary, facts, recentTurns };
   }
 
+  /**
+   * Digest freshly exchanged turns into the summary and facts. Never throws: by the time
+   * this runs the reply has already been delivered, so a memory failure is logged only.
+   */
   async afterReply(convId: string, newTurns: ThreadItem[]): Promise<void> {
     if (!newTurns.length) return;
 
-    const [oldSummary, oldFacts] = await Promise.all([this.readSummary(convId), this.readFacts(convId)]);
+    try {
+      const [oldSummary, oldFacts] = await Promise.all([this.readSummary(convId), this.readFacts(convId)]);
+      const delta = newTurns.map((t) => `${t.role.toUpperCase()}: ${t.text}`).join("\n\n");
 
-    const delta = newTurns.map((t) => `${t.role.toUpperCase()}: ${t.text}`).join("\n\n");
-
-    if (this.provider) {
-      const newSummary = await this.updateSummaryWithLLM(oldSummary, delta);
-      await this.writeSummary(convId, newSummary);
-      const newFacts = await this.updateFactsWithLLM(oldFacts, delta);
-      await this.writeFacts(convId, newFacts);
-    } else {
-      const newSummary = (oldSummary ? oldSummary + "\n\n" : "") + delta;
-      await this.writeSummary(convId, newSummary.slice(0, 6000));
+      if (this.provider) {
+        const [newSummary, newFacts] = await Promise.all([
+          this.updateSummaryWithLLM(oldSummary, delta),
+          this.updateFactsWithLLM(oldFacts, delta),
+        ]);
+        await Promise.all([this.writeSummary(convId, newSummary), this.writeFacts(convId, newFacts)]);
+      } else {
+        // No LLM: append the raw turns and keep the most recent part under the cap.
+        const combined = (oldSummary.trim() ? oldSummary.trim() + "\n\n" : "") + delta;
+        await this.writeSummary(convId, combined.slice(-SUMMARY_MAX_CHARS));
+      }
+    } catch (e) {
+      this.logger.warn(`[memory] update failed for ${convId}: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
 
@@ -116,7 +157,7 @@ export class MemoryEngine {
       max_tokens: 700,
     });
 
-    return res.text;
+    return res.text.trim() || oldSummary;
   }
 
   private async updateFactsWithLLM(oldFacts: Record<string, unknown>, delta: string): Promise<Record<string, unknown>> {
@@ -147,11 +188,6 @@ export class MemoryEngine {
       max_tokens: 700,
     });
 
-    try {
-      const obj = JSON.parse(res.text) as unknown;
-      return obj && typeof obj === "object" && !Array.isArray(obj) ? (obj as Record<string, unknown>) : oldFacts;
-    } catch {
-      return oldFacts;
-    }
+    return extractJsonObject(res.text) ?? oldFacts;
   }
 }

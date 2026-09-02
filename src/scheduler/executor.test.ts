@@ -30,6 +30,7 @@ function makeConfig(mail: Partial<AppConfig["mail"]> = {}): AppConfig {
     llm: {
       baseUrl: "",
       apiKey: "",
+      timeoutMs: 1000,
       models: { default: "m", files: "m", scheduler: "m", memorySummary: "m", memoryFacts: "m" },
     },
   };

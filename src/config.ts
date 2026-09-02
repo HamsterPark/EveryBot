@@ -40,6 +40,8 @@ export type AppConfig = {
   llm: {
     baseUrl: string;
     apiKey: string;
+    /** Per-attempt HTTP timeout for LLM calls, in milliseconds. */
+    timeoutMs: number;
     models: {
       default: string;
       files: string;
@@ -79,8 +81,10 @@ export function loadConfig(): AppConfig {
       },
     },
     llm: {
-      baseUrl: envOptional("SILICONFLOW_BASE_URL", "https://api.siliconflow.com/v1"),
-      apiKey: envOptional("SILICONFLOW_API_KEY", ""),
+      // Generic names first; the SILICONFLOW_* names stay supported for existing setups.
+      baseUrl: envOptional("LLM_BASE_URL", envOptional("SILICONFLOW_BASE_URL", "https://api.siliconflow.com/v1")),
+      apiKey: envOptional("LLM_API_KEY", envOptional("SILICONFLOW_API_KEY", "")),
+      timeoutMs: envInt("LLM_TIMEOUT_MS", 60_000),
       models: {
         default: defaultModel,
         files: envOptional("MODEL_FILES", defaultModel),
