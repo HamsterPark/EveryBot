@@ -186,13 +186,8 @@ export class EmailChannel {
       await this.convStore.saveMeta(meta);
     }
 
-    await this.convStore.append(meta.convId, {
-      role: "user",
-      text: inb.text,
-      at: new Date().toISOString(),
-      emailId: inb.messageId ?? undefined,
-    });
-
+    // Context must come from turns before this message: the agent appends the current
+    // user message itself, so persisting it first would send it twice.
     const memory: MemoryPack = this.memoryEngine
       ? await this.memoryEngine.buildMemoryPack(meta.convId)
       : {
@@ -200,6 +195,13 @@ export class EmailChannel {
           facts: {},
           recentTurns: (await this.convStore.getThread(meta.convId)).map((t) => ({ role: t.role, text: t.text })),
         };
+
+    await this.convStore.append(meta.convId, {
+      role: "user",
+      text: inb.text,
+      at: new Date().toISOString(),
+      emailId: inb.messageId ?? undefined,
+    });
 
     const agent = this.agents.get(agentId);
     const replyText = await agent.handle(inb.text, { convId: meta.convId, agentId }, memory);

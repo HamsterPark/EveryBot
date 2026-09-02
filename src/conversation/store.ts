@@ -1,17 +1,22 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { randomBytes } from "node:crypto";
+import { assertValidId, isValidId } from "./ids.js";
 import type { ConvMeta, ThreadItem } from "./types.js";
 
 function randomConvId(): string {
   return randomBytes(5).toString("hex").toUpperCase();
 }
 
+/**
+ * File-backed conversation store: data/conv/<convId>/meta.json + thread.jsonl.
+ * Every convId is validated before it is joined into a path.
+ */
 export class ConversationStore {
   constructor(private dataDir: string) {}
 
   private convDir(convId: string): string {
-    return path.join(this.dataDir, "conv", convId);
+    return path.join(this.dataDir, "conv", assertValidId(convId, "conversation id"));
   }
 
   private metaPath(convId: string): string {
@@ -22,8 +27,8 @@ export class ConversationStore {
     return path.join(this.convDir(convId), "thread.jsonl");
   }
 
-  async createConversation(agentId: string): Promise<ConvMeta> {
-    const convId = randomConvId();
+  /** Create a conversation; pass an explicit id to get a stable, addressable conversation. */
+  async createConversation(agentId: string, convId: string = randomConvId()): Promise<ConvMeta> {
     const dir = this.convDir(convId);
     await fs.mkdir(dir, { recursive: true });
     const now = new Date().toISOString();
@@ -48,11 +53,23 @@ export class ConversationStore {
     await fs.writeFile(this.metaPath(meta.convId), JSON.stringify(meta, null, 2), "utf-8");
   }
 
+  /** Load the conversation, or start a fresh one (with a new random id) when it does not exist. */
   async ensureConversation(convId: string, defaultAgent: string): Promise<ConvMeta> {
+    assertValidId(convId, "conversation id");
     try {
       return await this.loadMeta(convId);
     } catch {
       return await this.createConversation(defaultAgent);
+    }
+  }
+
+  /** Load the conversation, or create it under exactly this id. */
+  async getOrCreateConversation(convId: string, agentId: string): Promise<ConvMeta> {
+    assertValidId(convId, "conversation id");
+    try {
+      return await this.loadMeta(convId);
+    } catch {
+      return await this.createConversation(agentId, convId);
     }
   }
 
@@ -75,10 +92,11 @@ export class ConversationStore {
       const ids = await fs.readdir(convRoot);
       const metas: ConvMeta[] = [];
       for (const id of ids) {
+        if (!isValidId(id)) continue;
         try {
           metas.push(await this.loadMeta(id));
         } catch {
-          // skip invalid
+          // skip directories without a readable meta.json
         }
       }
       metas.sort((a, b) => (b.updatedAt ?? "").localeCompare(a.updatedAt ?? ""));

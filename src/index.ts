@@ -61,9 +61,12 @@ async function main(): Promise<void> {
     approvalManager,
     schedulerEngine,
   });
-  await startHttpServer(server, cfg.port);
+  await startHttpServer(server, cfg.port, cfg.host);
 
-  console.log(`[EveryBot] HTTP server listening on http://localhost:${cfg.port}`);
+  console.log(`[EveryBot] HTTP server listening on http://${cfg.host}:${cfg.port}`);
+  if (cfg.host !== "127.0.0.1" && cfg.host !== "localhost") {
+    console.warn("[EveryBot] WARNING: the API has no authentication; only expose it on trusted networks.");
+  }
 
   const processedStore = new ProcessedStore(cfg.dataDir);
   const emailChannel = new EmailChannel(cfg, agents, convStore, processedStore, memoryEngine);
@@ -111,6 +114,17 @@ async function main(): Promise<void> {
 
   const schedulerRunner = new SchedulerRunner(schedulerEngine, executor);
   await schedulerRunner.start();
+
+  const shutdown = async (signal: string): Promise<void> => {
+    console.log(`[EveryBot] ${signal} received, shutting down`);
+    schedulerRunner.stop();
+    await emailChannel.stop();
+    server.close();
+    process.exit(0);
+  };
+  for (const signal of ["SIGINT", "SIGTERM"] as const) {
+    process.once(signal, () => void shutdown(signal));
+  }
 }
 
 main().catch((e) => {

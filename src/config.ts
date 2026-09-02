@@ -23,7 +23,11 @@ export type AppConfig = {
   workspaceRoot: string;
   pollIntervalMs: number;
   defaultAgent: string;
+  /** Interface the HTTP server binds to. Defaults to loopback: the API has no authentication. */
+  host: string;
   port: number;
+  /** Exact origin allowed to call the API cross-origin, or null to send no CORS headers at all. */
+  allowedOrigin: string | null;
   mail: {
     user: string;
     pass: string;
@@ -46,13 +50,16 @@ export type AppConfig = {
 export function loadConfig(): AppConfig {
   const dataDir = path.resolve(envOptional("DATA_DIR", "./data"));
   const workspaceRoot = path.join(dataDir, "workspace");
+  const defaultModel = envOptional("MODEL_DEFAULT", "deepseek-ai/DeepSeek-V3");
 
   return {
     dataDir,
     workspaceRoot,
     pollIntervalMs: envInt("POLL_INTERVAL_MS", 15000),
     defaultAgent: envOptional("DEFAULT_AGENT", "default"),
+    host: envOptional("HOST", "127.0.0.1"),
     port: envInt("PORT", 3000),
+    allowedOrigin: envOptional("ALLOWED_ORIGIN", "").trim() || null,
     mail: {
       user: envOptional("MAIL_USER", ""),
       pass: envOptional("MAIL_PASS", ""),
@@ -71,11 +78,11 @@ export function loadConfig(): AppConfig {
       baseUrl: envOptional("SILICONFLOW_BASE_URL", "https://api.siliconflow.com/v1"),
       apiKey: envOptional("SILICONFLOW_API_KEY", ""),
       models: {
-        default: envOptional("MODEL_DEFAULT", "deepseek-ai/DeepSeek-V3"),
-        files: envOptional("MODEL_FILES", envOptional("MODEL_DEFAULT", "deepseek-ai/DeepSeek-V3")),
-        scheduler: envOptional("MODEL_SCHEDULER", envOptional("MODEL_DEFAULT", "deepseek-ai/DeepSeek-V3")),
-        memorySummary: envOptional("MODEL_MEMORY_SUMMARY", envOptional("MODEL_DEFAULT", "deepseek-ai/DeepSeek-V3")),
-        memoryFacts: envOptional("MODEL_MEMORY_FACTS", envOptional("MODEL_DEFAULT", "deepseek-ai/DeepSeek-V3")),
+        default: defaultModel,
+        files: envOptional("MODEL_FILES", defaultModel),
+        scheduler: envOptional("MODEL_SCHEDULER", defaultModel),
+        memorySummary: envOptional("MODEL_MEMORY_SUMMARY", defaultModel),
+        memoryFacts: envOptional("MODEL_MEMORY_FACTS", defaultModel),
       },
     },
   };
