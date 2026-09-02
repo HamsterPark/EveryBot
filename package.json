@@ -4,6 +4,12 @@
   "description": "Moltbot-Lite: Windows-first AI assistant with Web + Mail, workspace files, memory, and scheduled tasks",
   "type": "module",
   "main": "dist/index.js",
+  "license": "MIT",
+  "private": true,
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "packageManager": "npm@11.9.0",
   "scripts": {
     "dev": "node --import tsx src/index.ts",
     "build": "tsc -p tsconfig.json",
@@ -13,27 +19,24 @@
     "lint": "eslint src --ext .ts",
     "format": "prettier --write \"src/**/*.ts\""
   },
-  "engines": {
-    "node": ">=20.0.0"
-  },
-  "packageManager": "pnpm@10.0.0",
   "dependencies": {
-    "croner": "^9.1.0",
-    "dotenv": "^16.4.5",
-    "imapflow": "^1.0.200",
-    "mailparser": "^3.6.6",
-    "nodemailer": "^6.9.16",
-    "pino": "^9.5.0"
+    "croner": "^10.0.1",
+    "dotenv": "^16.6.1",
+    "imapflow": "^1.7.8",
+    "mailparser": "^3.9.20",
+    "nodemailer": "^9.1.1",
+    "pino": "^10.3.1"
   },
   "devDependencies": {
-    "@types/nodemailer": "^6.4.16",
-    "@eslint/js": "^9.15.0",
-    "@types/node": "^22.10.0",
-    "eslint": "^9.15.0",
-    "prettier": "^3.3.3",
-    "tsx": "^4.19.2",
-    "typescript": "^5.6.3",
-    "typescript-eslint": "^8.15.0",
-    "vitest": "^2.1.6"
+    "@eslint/js": "^10.0.1",
+    "@types/mailparser": "^3.4.6",
+    "@types/node": "^22.19.7",
+    "@types/nodemailer": "^8.0.1",
+    "eslint": "^10.9.1",
+    "prettier": "^3.9.6",
+    "tsx": "^4.23.13",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.69.0",
+    "vitest": "^4.1.11"
   }
 }
