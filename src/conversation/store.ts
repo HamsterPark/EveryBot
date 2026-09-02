@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { randomBytes } from "node:crypto";
+import { writeFileAtomic } from "../core/atomicWrite.js";
 import { assertValidId, isValidId } from "./ids.js";
 import type { ConvMeta, ThreadItem } from "./types.js";
 
@@ -39,7 +40,7 @@ export class ConversationStore {
       createdAt: now,
       updatedAt: now,
     };
-    await fs.writeFile(this.metaPath(convId), JSON.stringify(meta, null, 2), "utf-8");
+    await writeFileAtomic(this.metaPath(convId), JSON.stringify(meta, null, 2));
     return meta;
   }
 
@@ -50,7 +51,7 @@ export class ConversationStore {
 
   async saveMeta(meta: ConvMeta): Promise<void> {
     meta.updatedAt = new Date().toISOString();
-    await fs.writeFile(this.metaPath(meta.convId), JSON.stringify(meta, null, 2), "utf-8");
+    await writeFileAtomic(this.metaPath(meta.convId), JSON.stringify(meta, null, 2));
   }
 
   /** Load the conversation, or start a fresh one (with a new random id) when it does not exist. */

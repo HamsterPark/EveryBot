@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { writeFileAtomic } from "../core/atomicWrite.js";
 
 export type TaskAction =
   | { type: "sendMessage"; channel: string; target?: string; textTemplate: string }
@@ -69,8 +70,7 @@ export class SchedulerEngine {
   }
 
   async save(): Promise<void> {
-    await fs.mkdir(path.dirname(this.filePath), { recursive: true });
-    await fs.writeFile(this.filePath, JSON.stringify({ tasks: this.tasks }, null, 2), "utf-8");
+    await writeFileAtomic(this.filePath, JSON.stringify({ tasks: this.tasks }, null, 2));
   }
 
   getTasks(): Task[] {

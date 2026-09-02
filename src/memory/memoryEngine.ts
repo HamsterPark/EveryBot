@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { writeFileAtomic } from "../core/atomicWrite.js";
 import type { LLMProvider } from "../core/llmProvider.js";
 import type { ConversationStore } from "../conversation/store.js";
 import type { ThreadItem } from "../conversation/store.js";
@@ -39,9 +40,8 @@ export class MemoryEngine {
   }
 
   async writeSummary(convId: string, summary: string): Promise<void> {
-    await fs.mkdir(this.convDir(convId), { recursive: true });
     const trimmed = (summary ?? "").trim().slice(0, 6000);
-    await fs.writeFile(this.summaryPath(convId), trimmed + "\n", "utf-8");
+    await writeFileAtomic(this.summaryPath(convId), trimmed + "\n");
   }
 
   async readFacts(convId: string): Promise<Record<string, unknown>> {
@@ -55,8 +55,7 @@ export class MemoryEngine {
   }
 
   async writeFacts(convId: string, facts: Record<string, unknown>): Promise<void> {
-    await fs.mkdir(this.convDir(convId), { recursive: true });
-    await fs.writeFile(this.factsPath(convId), JSON.stringify(facts ?? {}, null, 2), "utf-8");
+    await writeFileAtomic(this.factsPath(convId), JSON.stringify(facts ?? {}, null, 2));
   }
 
   async buildMemoryPack(convId: string, recentN = 10): Promise<MemoryPack> {
