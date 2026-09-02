@@ -1,186 +1,477 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>EveryBot</title>
     <style>
+      :root {
+        --bg: #f4f5f7;
+        --panel: #ffffff;
+        --border: #e2e5ea;
+        --text: #1f2933;
+        --muted: #6b7280;
+        --accent: #2563eb;
+        --accent-soft: #e8efff;
+        --bot: #eef1f5;
+        --danger: #b91c1c;
+        --ok: #16a34a;
+      }
       * {
         box-sizing: border-box;
       }
       body {
-        font-family: system-ui, sans-serif;
         margin: 0;
-        padding: 1rem;
-        max-width: 640px;
-        margin-inline: auto;
+        font-family:
+          system-ui,
+          -apple-system,
+          "Segoe UI",
+          Roboto,
+          sans-serif;
+        font-size: 14px;
+        color: var(--text);
+        background: var(--bg);
+        height: 100vh;
+        display: grid;
+        grid-template-columns: 280px 1fr;
+      }
+      aside {
+        background: var(--panel);
+        border-right: 1px solid var(--border);
+        padding: 16px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+      }
+      main {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
       }
       h1 {
-        font-size: 1.25rem;
+        font-size: 18px;
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 8px;
       }
-      #sessions {
-        margin-bottom: 1rem;
+      h2 {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--muted);
+        margin: 0 0 8px;
       }
-      #sessions select {
+      .status {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--muted);
+      }
+      .status.ok {
+        background: var(--ok);
+      }
+      button {
+        font: inherit;
+        border: 1px solid var(--border);
+        background: var(--panel);
+        color: var(--text);
+        border-radius: 6px;
+        padding: 6px 10px;
+        cursor: pointer;
+      }
+      button:hover {
+        border-color: var(--accent);
+      }
+      button:disabled {
+        opacity: 0.5;
+        cursor: default;
+      }
+      button.primary {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #fff;
+      }
+      button.small {
+        padding: 2px 8px;
+        font-size: 12px;
+      }
+      .list {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .list .item {
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 6px 8px;
+        text-align: left;
         width: 100%;
-        padding: 0.5rem;
+        background: var(--panel);
+      }
+      .list .item.active {
+        border-color: var(--accent);
+        background: var(--accent-soft);
+      }
+      .item .meta {
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .row {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .empty {
+        color: var(--muted);
+        font-size: 13px;
+      }
+      code {
+        font-size: 12px;
+        background: var(--bot);
+        padding: 1px 4px;
+        border-radius: 4px;
+      }
+      header {
+        padding: 14px 24px;
+        border-bottom: 1px solid var(--border);
+        background: var(--panel);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      header .muted {
+        color: var(--muted);
+        font-size: 13px;
       }
       #thread {
-        min-height: 200px;
-        border: 1px solid #ccc;
-        padding: 0.75rem;
-        margin-bottom: 0.75rem;
-        border-radius: 6px;
-        background: #fafafa;
+        flex: 1;
+        overflow-y: auto;
+        padding: 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
       }
       .msg {
-        margin-bottom: 0.5rem;
+        max-width: 70%;
+        padding: 10px 14px;
+        border-radius: 12px;
+        white-space: pre-wrap;
+        word-break: break-word;
+        line-height: 1.45;
       }
       .msg.user {
-        color: #06c;
+        align-self: flex-end;
+        background: var(--accent);
+        color: #fff;
+        border-bottom-right-radius: 4px;
       }
       .msg.bot {
-        color: #363;
+        align-self: flex-start;
+        background: var(--bot);
+        border-bottom-left-radius: 4px;
       }
-      #inputRow {
+      .msg .tag {
+        display: block;
+        font-size: 11px;
+        opacity: 0.7;
+        margin-top: 6px;
+      }
+      form {
         display: flex;
-        gap: 0.5rem;
+        gap: 8px;
+        padding: 16px 24px;
+        border-top: 1px solid var(--border);
+        background: var(--panel);
       }
-      #inputRow input {
+      textarea {
         flex: 1;
-        padding: 0.5rem;
+        font: inherit;
+        resize: none;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 10px 12px;
+        min-height: 44px;
+        max-height: 160px;
       }
-      #inputRow button {
-        padding: 0.5rem 1rem;
+      textarea:focus {
+        outline: 2px solid var(--accent-soft);
+        border-color: var(--accent);
       }
-      .error {
-        color: #c00;
+      select {
+        font: inherit;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 0 8px;
+        background: var(--panel);
+      }
+      #error {
+        color: var(--danger);
+        padding: 0 24px 12px;
+        min-height: 18px;
+        font-size: 13px;
+      }
+      @media (max-width: 720px) {
+        body {
+          grid-template-columns: 1fr;
+        }
+        aside {
+          display: none;
+        }
       }
     </style>
   </head>
   <body>
-    <h1>EveryBot</h1>
-    <div id="sessions">
-      <label
-        >会话:
-        <select id="sessionSelect"></select
-      ></label>
-      <button type="button" id="newSession">新建会话</button>
-    </div>
-    <div id="thread"></div>
-    <div id="inputRow">
-      <input type="text" id="messageInput" placeholder="输入消息..." />
-      <button type="button" id="sendBtn">发送</button>
-    </div>
-    <p id="error" class="error"></p>
+    <aside>
+      <h1><span id="status" class="status" title="server status"></span>EveryBot</h1>
+
+      <section>
+        <div class="row">
+          <h2>Sessions</h2>
+          <button type="button" class="small" id="newSession">New chat</button>
+        </div>
+        <div id="sessions" class="list"></div>
+      </section>
+
+      <section>
+        <h2>Pending approvals</h2>
+        <div id="approvals" class="list"></div>
+      </section>
+
+      <section>
+        <h2>Scheduled tasks</h2>
+        <div id="tasks" class="list"></div>
+      </section>
+    </aside>
+
+    <main>
+      <header>
+        <div id="sessionTitle">No session selected</div>
+        <div class="muted">Replies also arrive by e-mail when the mail channel is configured</div>
+      </header>
+      <div id="thread"></div>
+      <div id="error" role="alert"></div>
+      <form id="composer">
+        <textarea
+          id="messageInput"
+          rows="1"
+          placeholder="Message EveryBot… (Enter to send, Shift+Enter for a new line)"
+        ></textarea>
+        <select id="agentSelect" title="agent">
+          <option value="default">default</option>
+          <option value="files">files</option>
+          <option value="scheduler">scheduler</option>
+        </select>
+        <button type="submit" class="primary" id="sendBtn">Send</button>
+      </form>
+    </main>
 
     <script>
-      const API_BASE = window.location.origin;
-      const sessionSelect = document.getElementById("sessionSelect");
-      const threadEl = document.getElementById("thread");
-      const messageInput = document.getElementById("messageInput");
-      const sendBtn = document.getElementById("sendBtn");
-      const newSessionBtn = document.getElementById("newSession");
-      const errorEl = document.getElementById("error");
+      const $ = (id) => document.getElementById(id);
+      const state = { sessionId: null, sending: false };
 
-      let currentSessionId = null;
+      async function api(path, options = {}) {
+        const res = await fetch(path, {
+          method: options.method || "GET",
+          headers: options.body ? { "Content-Type": "application/json" } : {},
+          body: options.body ? JSON.stringify(options.body) : undefined,
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+        return data;
+      }
 
-      function setError(msg) {
-        errorEl.textContent = msg || "";
+      function el(tag, props = {}, children = []) {
+        const node = document.createElement(tag);
+        Object.assign(node, props);
+        for (const child of children) node.append(child);
+        return node;
+      }
+
+      function setError(message) {
+        $("error").textContent = message || "";
+      }
+
+      async function refreshHealth() {
+        try {
+          await api("/health");
+          $("status").classList.add("ok");
+        } catch {
+          $("status").classList.remove("ok");
+        }
       }
 
       async function loadSessions() {
-        try {
-          const res = await fetch(API_BASE + "/api/sessions");
-          const data = await res.json();
-          const sessions = data.sessions || [];
-          sessionSelect.innerHTML = "";
-          const opt0 = document.createElement("option");
-          opt0.value = "";
-          opt0.textContent = "(选择或新建)";
-          sessionSelect.appendChild(opt0);
-          for (const s of sessions) {
-            const opt = document.createElement("option");
-            opt.value = s.convId;
-            opt.textContent = s.convId + " (" + (s.updatedAt || "").slice(0, 10) + ")";
-            sessionSelect.appendChild(opt);
-          }
-          if (currentSessionId) {
-            sessionSelect.value = currentSessionId;
-          }
-        } catch (e) {
-          setError("加载会话列表失败: " + e.message);
+        const { sessions } = await api("/api/sessions");
+        const box = $("sessions");
+        box.replaceChildren();
+        if (!sessions.length) box.append(el("div", { className: "empty", textContent: "No sessions yet." }));
+        if (!state.sessionId && sessions.length) state.sessionId = sessions[0].convId;
+        for (const s of sessions) {
+          const button = el(
+            "button",
+            { type: "button", className: "item" + (s.convId === state.sessionId ? " active" : "") },
+            [
+              el("div", { textContent: s.convId }),
+              el("div", {
+                className: "meta",
+                textContent: `${s.agentId} · ${(s.updatedAt || "").slice(0, 16).replace("T", " ")}`,
+              }),
+            ]
+          );
+          button.addEventListener("click", () => selectSession(s.convId));
+          box.append(button);
         }
       }
 
       async function loadThread() {
-        if (!currentSessionId) {
-          threadEl.innerHTML = "<p>选择或新建会话后发送消息。</p>";
+        const box = $("thread");
+        box.replaceChildren();
+        if (!state.sessionId) {
+          $("sessionTitle").textContent = "New chat";
+          box.append(el("div", { className: "empty", textContent: "Send a message to start a new session." }));
           return;
         }
-        try {
-          const res = await fetch(API_BASE + "/api/thread?sessionId=" + encodeURIComponent(currentSessionId));
-          const data = await res.json();
-          const thread = data.thread || [];
-          threadEl.innerHTML =
-            thread.map((m) => '<div class="msg ' + m.role + '">' + escapeHtml(m.text) + "</div>").join("") ||
-            "<p>暂无消息</p>";
-          threadEl.scrollTop = threadEl.scrollHeight;
-        } catch (e) {
-          setError("加载对话失败: " + e.message);
+        $("sessionTitle").textContent = `Session ${state.sessionId}`;
+        const { thread } = await api(`/api/thread?sessionId=${encodeURIComponent(state.sessionId)}`);
+        if (!thread.length) box.append(el("div", { className: "empty", textContent: "No messages yet." }));
+        for (const m of thread) {
+          const tag = m.role === "bot" ? `#${m.msgNo ?? "?"} · ${m.agentId ?? "bot"}` : "you";
+          box.append(
+            el("div", { className: `msg ${m.role}` }, [m.text, el("span", { className: "tag", textContent: tag })])
+          );
+        }
+        box.scrollTop = box.scrollHeight;
+      }
+
+      async function loadApprovals() {
+        const { pending } = await api("/api/approvals");
+        const box = $("approvals");
+        box.replaceChildren();
+        if (!pending.length) box.append(el("div", { className: "empty", textContent: "Nothing waiting." }));
+        for (const p of pending) {
+          const approve = el("button", { type: "button", className: "small primary", textContent: "Approve" });
+          const reject = el("button", { type: "button", className: "small", textContent: "Reject" });
+          approve.addEventListener("click", () => decide(p.id, "approve"));
+          reject.addEventListener("click", () => decide(p.id, "reject"));
+          box.append(
+            el("div", { className: "item" }, [
+              el("div", { textContent: `${p.tool} ${p.args?.path ?? ""}` }),
+              el("div", { className: "row" }, [
+                el("span", { className: "meta", textContent: p.at.slice(11, 19) }),
+                el("span", {}, [approve, reject]),
+              ]),
+            ])
+          );
         }
       }
 
-      function escapeHtml(s) {
-        const div = document.createElement("div");
-        div.textContent = s;
-        return div.innerHTML;
+      async function decide(id, action) {
+        try {
+          await api(`/api/approvals/${encodeURIComponent(id)}/${action}`, { method: "POST" });
+          await loadApprovals();
+        } catch (e) {
+          setError(e.message);
+        }
+      }
+
+      async function loadTasks() {
+        const { tasks } = await api("/api/tasks");
+        const box = $("tasks");
+        box.replaceChildren();
+        if (!tasks.length)
+          box.append(el("div", { className: "empty", textContent: "No tasks. Create one with POST /api/tasks." }));
+        for (const t of tasks) {
+          const run = el("button", { type: "button", className: "small", textContent: "Run" });
+          const remove = el("button", { type: "button", className: "small", textContent: "Delete" });
+          run.addEventListener("click", () => taskAction(t.id, "run"));
+          remove.addEventListener("click", () => taskAction(t.id, "delete"));
+          box.append(
+            el("div", { className: "item" }, [
+              el("div", {}, [
+                el("code", { textContent: t.cron }),
+                ` ${t.action.type}${t.enabled ? "" : " (disabled)"}`,
+              ]),
+              el("div", { className: "row" }, [
+                el("span", { className: "meta", textContent: t.id }),
+                el("span", {}, [run, remove]),
+              ]),
+            ])
+          );
+        }
+      }
+
+      async function taskAction(id, action) {
+        try {
+          if (action === "delete") {
+            if (!confirm(`Delete task ${id}?`)) return;
+            await api(`/api/tasks/${encodeURIComponent(id)}`, { method: "DELETE" });
+          } else {
+            const result = await api(`/api/tasks/${encodeURIComponent(id)}/run`, { method: "POST" });
+            if (!result.ok) setError(`Task failed: ${result.detail}`);
+          }
+          await Promise.all([loadTasks(), loadApprovals(), loadSessions()]);
+        } catch (e) {
+          setError(e.message);
+        }
+      }
+
+      async function selectSession(id) {
+        state.sessionId = id;
+        setError("");
+        await Promise.all([loadSessions(), loadThread()]);
       }
 
       async function sendMessage() {
-        const text = messageInput.value?.trim();
-        if (!text) return;
+        const text = $("messageInput").value.trim();
+        if (!text || state.sending) return;
+        state.sending = true;
+        $("sendBtn").disabled = true;
+        $("messageInput").disabled = true;
         setError("");
         try {
-          const res = await fetch(API_BASE + "/api/chat", {
+          const data = await api("/api/chat", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              sessionId: currentSessionId || undefined,
-              message: text,
-            }),
+            body: { sessionId: state.sessionId || undefined, message: text, agentId: $("agentSelect").value },
           });
-          const data = await res.json();
-          if (data.error) {
-            setError(data.error);
-            return;
-          }
-          if (data.sessionId) {
-            currentSessionId = data.sessionId;
-            await loadSessions();
-          }
-          messageInput.value = "";
-          await loadThread();
+          state.sessionId = data.sessionId;
+          $("messageInput").value = "";
+          await Promise.all([loadSessions(), loadThread()]);
         } catch (e) {
-          setError("发送失败: " + e.message);
+          setError(`Send failed: ${e.message}`);
+        } finally {
+          state.sending = false;
+          $("sendBtn").disabled = false;
+          $("messageInput").disabled = false;
+          $("messageInput").focus();
         }
       }
 
-      sessionSelect.addEventListener("change", () => {
-        currentSessionId = sessionSelect.value || null;
-        loadThread();
+      $("composer").addEventListener("submit", (e) => {
+        e.preventDefault();
+        sendMessage();
       });
-      newSessionBtn.addEventListener("click", () => {
-        currentSessionId = null;
-        sessionSelect.value = "";
-        threadEl.innerHTML = "<p>新建会话。输入消息后发送。</p>";
+      $("messageInput").addEventListener("keydown", (e) => {
+        // isComposing: Enter confirms an IME candidate (Chinese/Japanese input); never send then.
+        if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
+          e.preventDefault();
+          sendMessage();
+        }
       });
-      sendBtn.addEventListener("click", sendMessage);
-      messageInput.addEventListener("keydown", (e) => {
-        if (e.key === "Enter") sendMessage();
+      $("newSession").addEventListener("click", () => {
+        state.sessionId = null;
+        Promise.all([loadSessions(), loadThread()]).catch((e) => setError(e.message));
+        $("messageInput").focus();
       });
 
-      loadSessions();
+      async function refreshAll() {
+        await Promise.all([refreshHealth(), loadSessions(), loadApprovals(), loadTasks()]);
+        await loadThread();
+      }
+      refreshAll().catch((e) => setError(e.message));
+      setInterval(() => Promise.all([refreshHealth(), loadApprovals(), loadTasks()]).catch(() => {}), 10000);
     </script>
   </body>
 </html>
