@@ -1,3 +1,5 @@
+// Load .env before anything reads process.env (side-effect import must stay first).
+import "dotenv/config";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { loadConfig } from "./config.js";
@@ -63,7 +65,6 @@ async function main(): Promise<void> {
   });
   await startHttpServer(server, cfg.port);
 
-  // eslint-disable-next-line no-console
   console.log(`[EveryBot] HTTP server listening on http://localhost:${cfg.port}`);
 
   const processedStore = new ProcessedStore(cfg.dataDir);

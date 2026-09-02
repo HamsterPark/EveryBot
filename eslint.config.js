@@ -10,5 +10,6 @@ export default [
       "@typescript-eslint/no-explicit-any": "warn",
     },
   },
-  { ignores: ["dist/**", "node_modules/**", "data/**", "moltbot-main/**", "ui/**"] },
+  // ui/index.html carries a small inline script that is not type-checked TypeScript.
+  { ignores: ["dist/**", "node_modules/**", "data/**", "coverage/**", "ui/**"] },
 ];

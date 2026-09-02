@@ -1,11 +1,5 @@
 import path from "node:path";
 
-function env(name: string, fallback?: string): string {
-  const v = process.env[name] ?? fallback;
-  if (v == null || v === "") throw new Error(`Missing env: ${name}`);
-  return v;
-}
-
 function envOptional(name: string, fallback: string): string {
   return process.env[name] ?? fallback;
 }

@@ -1,6 +1,6 @@
 import { ImapFlow } from "imapflow";
 import nodemailer from "nodemailer";
-import { simpleParser } from "mailparser";
+import { simpleParser, type ParsedMail } from "mailparser";
 import pino from "pino";
 import type { AppConfig } from "../config.js";
 import type { AgentRegistry } from "../core/agents.js";
@@ -88,69 +88,79 @@ export class EmailChannel {
     }
   }
 
+  /** Mark a message as read; always addressed by UID so it is stable across expunges. */
+  private async markSeen(uid: number): Promise<void> {
+    await this.imap.messageFlagsAdd(String(uid), ["\\Seen"], { uid: true });
+  }
+
   private async pollOnce(): Promise<void> {
-    const uids = await this.imap.search({ seen: false });
-    if (!uids.length) return;
+    const uids = await this.imap.search({ seen: false }, { uid: true });
+    if (!uids || uids.length === 0) return;
 
     this.log.info({ count: uids.length }, "Found unseen emails");
 
     for (const uid of uids) {
-      const msg = await this.imap.fetchOne(uid, { source: true, envelope: true });
-      if (!msg?.source) continue;
+      const msg = await this.imap.fetchOne(String(uid), { source: true, envelope: true }, { uid: true });
+      if (!msg || !msg.source) continue;
 
-      const parsed = await simpleParser(msg.source as Buffer);
+      const parsed = await simpleParser(msg.source);
       const inbound = this.toInbound(parsed);
 
       const dedupeKey = inbound.messageId ? `mid:${inbound.messageId}` : `uid:${uid}`;
       if (this.processed.has(dedupeKey)) {
-        await this.imap.messageFlagsAdd(uid, ["\\Seen"]);
+        await this.markSeen(uid);
         continue;
       }
 
       if (inbound.hasBotHeader) {
         await this.processed.add(dedupeKey);
-        await this.imap.messageFlagsAdd(uid, ["\\Seen"]);
+        await this.markSeen(uid);
         continue;
       }
 
       if (!inbound.from) {
         await this.processed.add(dedupeKey);
-        await this.imap.messageFlagsAdd(uid, ["\\Seen"]);
+        await this.markSeen(uid);
         continue;
       }
 
       await this.handleInbound(inbound);
 
       await this.processed.add(dedupeKey);
-      await this.imap.messageFlagsAdd(uid, ["\\Seen"]);
+      await this.markSeen(uid);
     }
   }
 
-  private toInbound(parsed: { headers?: Map<string, unknown>; from?: { value?: Array<{ address?: string }> }; subject?: string; text?: string; html?: string; messageId?: string; inReplyTo?: string; references?: unknown }): Inbound {
-    const headers = parsed.headers;
+  private toInbound(parsed: ParsedMail): Inbound {
     const hasBotHeader = (() => {
-      const v = headers?.get("x-moltbot-out");
+      const v = parsed.headers.get("x-moltbot-out");
       if (!v) return false;
       const s = String(v).trim().toLowerCase();
       return s === "1" || s === "true" || s === "yes";
     })();
 
-    const fromAddr = parsed.from?.value?.[0]?.address ? String(parsed.from.value[0].address) : null;
-    const subject = parsed.subject ? String(parsed.subject) : null;
+    const fromAddr = parsed.from?.value?.[0]?.address ?? null;
+    const subject = parsed.subject ?? null;
 
-    const textPart = (parsed.text ? String(parsed.text) : "").trim();
-    const htmlPart = parsed.html ? htmlToTextLoose(String(parsed.html)) : "";
+    const textPart = (parsed.text ?? "").trim();
+    const htmlPart = typeof parsed.html === "string" ? htmlToTextLoose(parsed.html) : "";
     const rawTextForCtxScan = [textPart, htmlPart].filter(Boolean).join("\n\n");
     const userText = (textPart || htmlPart || "").trim();
 
+    const references = Array.isArray(parsed.references)
+      ? parsed.references
+      : typeof parsed.references === "string"
+        ? [parsed.references]
+        : null;
+
     return {
-      messageId: parsed.messageId ? String(parsed.messageId) : null,
+      messageId: parsed.messageId ?? null,
       subject,
       from: fromAddr,
       text: userText,
       rawTextForCtxScan,
-      inReplyTo: parsed.inReplyTo ? String(parsed.inReplyTo) : null,
-      references: Array.isArray(parsed.references) ? parsed.references.map(String) : null,
+      inReplyTo: parsed.inReplyTo ?? null,
+      references,
       hasBotHeader,
     };
   }
@@ -201,7 +211,7 @@ export class EmailChannel {
 
     if (this.memoryEngine) {
       await this.memoryEngine.afterReply(meta.convId, [
-        { role: "user", text: inb.text, at: new Date().toISOString(), emailId: inb.messageId },
+        { role: "user", text: inb.text, at: new Date().toISOString(), emailId: inb.messageId ?? undefined },
         { role: "bot", text: replyText, at: new Date().toISOString(), msgNo, agentId },
       ]);
     }
